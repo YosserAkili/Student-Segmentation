@@ -1,0 +1,489 @@
+---
+title: "Student Well-Being"
+author: "Yosser Akili & Hana Ben Ali"
+date: "20/04/2022"
+output: html_document
+---
+
+# Topic
+Well-being is considered both the foundation of personal development and its ultimate goal. It refers to a serene and balanced psychological state where an individual can develop in all their potential. In the case of a student, well-being means being in a favorable mental state, free from all the worries and anxieties that hinder progress and skill development.
+
+# Objectives of Principal Component Analysis (PCA)
+PCA aims to describe a dataset, summarize it, and reduce its dimensionality. PCA performed on the individuals of the data table addresses various questions:
+- To what extent can a student's pocket money meet their needs?
+- Does the student take medication for stress or pressure?
+- Does the student engage in sports?
+
+## 1. Presentation of the Dataset:
+
+The dataset {student_wellbeing} is created using an online questionnaire with 591 rows and 48 columns.
+- The first part represents the timestamp, the well-being score indicating if the individual is flourishing or not, and some personal information: gender and age group.
+- The second part consists of 13 variables related to the student's school life, such as attendance in class sessions (class_presence), frequency of attendance (attendance_freq), organization of the schedule (schedule_organization), and supervision.
+- The third part includes variables describing the student's health (mental and physical) such as depression, sadness and worry, whether the student has suicidal thoughts or not, back pain, and stomach pain.
+- The fourth part describes the student's sports and associative activities.
+
+## 2. Import and Explore the Dataset:
+
+```{r }
+library(FactoMineR)
+library(readxl)
+data = read_excel("épanouissement_des_étudiants.xlsx")
+head(data)
+```
+
+
+```{r}
+library(ggplot2)
+ggplot(data, aes(x="", y=age, fill=age)) +
+  geom_bar(stat="identity", width=1) +
+  coord_polar("y", start=0)
+
+
+```
+
+
+
+```{r}
+library(ggplot2)
+ggplot(data, aes(x=age, fill=age )) + 
+  geom_bar( ) +
+  scale_fill_brewer(palette = "Set1") +
+  theme(legend.position="none")
+```
+
+## Data Cleaning:
+
+We start by checking for missing values:
+
+```{r }
+sum(is.na(data))
+data <- na.omit(data)
+
+```
+Since my dataset has 50 out of 591 missing values, we can remove them.
+
+
+# Column Selection
+```{r }
+library(dplyr)
+data1=select(data,encadrement,formation,interdivert, interetu, argentdiver,sports_collectifs,vie_associative,stress,mauvaise_concentration,etat_memoire,maux_de_tête)
+
+#data1=select(data,argentnecess,argentedu,argentdiver,depression,tristesse.inquietude,stress,mauvaise_concentration,etat_memoire,maux_de_tête)
+head(data1)
+```
+
+```{r}
+
+ 
+#Load the library
+library(DataExplorer)
+introduce(data1)
+
+
+
+```
+
+
+
+```{r}
+
+plot_histogram(data1)
+
+
+
+```
+
+
+
+## Normalized PCA
+We start by defining the matrix X composed of the frequencies of variables for each student. We define the weight matrix D=1nIn, where n is the sample size, and the metric M=Ip.
+
+
+### Calculation of the Centered Reduced Matrix
+Center and reduce matrix X.
+
+```{r }
+X=as.matrix(data1)
+g=colMeans(X)
+g
+
+```
+
+```{r }
+Y=sweep(x = X,2,g,FUN = '-')
+round(colMeans(X),3)
+head(Y)
+
+```
+
+
+```{r }
+n=nrow(X)
+p=ncol(X)
+et=apply(Y,2,function(x) sqrt(sum(x^2)/n))
+et
+
+```
+Calculation of the matrix of reduced input data Z. Verify that the variables in this matrix have a variance equal to 1.
+```{r }
+Z=sweep(x = Y,2,et,FUN = '/')
+colSums(Z^2)/n
+
+```
+
+### 2. Calculation of the Correlation Matrix
+Calculation of the correlation matrix R=Z′DZ, its eigenvalues, and eigenvectors.
+
+
+```{r }
+M=diag(rep(1,p)) 
+D=(1/n)*diag(rep(1,n))
+R=t(Z)%*%D%*%Z
+vp=eigen(R %*%M)
+lambda=vp$values
+lambda
+
+```
+
+
+```{r }
+U=vp$vectors
+U
+```
+
+Verify that the eigenvectors (i.e., the columns of U) are indeed orthonormal.
+
+```{r }
+round(t(U)%*%U,3)
+```
+### 3. Principal Components
+Calculate the matrix Psi of principal components given by Psi=Zu. Verify that the variance of each component is equal to the corresponding eigenvalue.
+
+```{r }
+Psi=Z%*%U
+head(Psi)
+```
+
+
+```{r }
+round(t(Psi)%*%D%*%Psi,3)
+```
+### 4. Coordinates of Variables on the Axes
+
+Let's calculate the matrix Eta of variable coordinates on the principal axes by \(Eta_\alpha = (\lambda_\alpha)^{-\frac{1}{2}}u_\alpha\)
+
+```{r }
+Eta<-sweep(U,2,sqrt(lambda),FUN='*')
+Eta 
+```
+
+
+```{r }
+round(t(U)%*%U,3)
+
+```
+# Standardized PCA with the FactoMineR Package and PCA Interpretation
+Now, let's use the PCA function to obtain the results obtained previously.
+
+Note that we are using the factoextra package rather than FactoMineR for the quality of its graphics.
+
+### 1. Relevance of PCA
+The corrgram below allows us to study the correlations between quantitative variables:
+```{r }
+library(corrplot)
+X=as.matrix(data1)
+M<-cor(X)
+library(RColorBrewer)
+corrplot(M, type="upper", order="hclust", 
+         col=brewer.pal(n=8, name="RdBu"))
+
+```
+The correlation matrix shows that the variables encadrement and formation are strongly and positively correlated, as well as etat_memoire, mauvaise_concentration, stress, and maux_de_tête.
+
+While the modalities sports_collectifs and stress are negatively correlated, as well as sports_collectifs and etat_memoire, sports_collectifs, and maux_de_tête.
+
+The modality interdivert (internet usage for entertainment) and etat_memoire are positively correlated.
+
+
+
+## 2. Choosing the Number of Retained Axes
+Three criteria should be used: cumulative inertia rate, Kaiser criterion, and the elbow criterion.
+
+The eig object is a matrix with three columns containing the eigenvalues of PCA, the proportion of variance of each component, and the cumulative variance by the principal components.
+
+```{r }
+library(factoextra)
+res.pca=PCA(data1,ncp = 5,scale.unit=TRUE,graph = F)
+head(res.pca$eig)
+
+```
+
+The first two axes of the analysis express 35.06% of the total inertia of the dataset. This means that 35.06% of the total variability of the individuals (or variables) is represented in this plan. This is a relatively average percentage.
+
+Considering the observations, it would probably be necessary to also consider dimensions greater than or equal to the third in the analysis.
+```{r }
+fviz_screeplot(res.pca, ncp=10)
+
+```
+**Figure 2 - Decomposition of Total Inertia**
+
+An estimate of the relevant number of axes to interpret suggests restricting the analysis to the description of the first 4 axes. These components reveal an inertia rate higher than that of the 0.95-quantile of random distributions (57.01% versus 42.68%). This observation suggests that only these axes carry real information. Therefore, the description of the analysis will be restricted to these axes.
+### 3. Interpretation of the Map of Variables
+The var object in res.pca contains 4 objects: coord, cor, cos2, and contrib. Note that since our PCA is standardized, cor (i.e., the correlation of a variable with the principal component of an axis) is identical to coord (i.e., the coordinate of this variable on that axis).
+
+```{r }
+names(res.pca$var)
+
+```
+The coord object in var contains the coordinates of the variables.
+
+```{r }
+res.pca$var$coord
+
+```
+The cos2 object in var is a matrix whose rows represent the squared cosine of the variable (i.e., the square of the coordinates since the PCA is standardized).
+
+```{r }
+res.pca$var$cos2
+
+```
+
+
+
+```{r }
+fviz_pca_var(res.pca, col.var="cos2") +
+  scale_color_gradient2(low="white", mid="blue", 
+                        high="RED", midpoint=0.2) + 
+  theme_minimal()
+fviz_pca_var(res.pca, col.var = "contrib", gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),repel = TRUE)
+
+```
+**Figure 3.2 - Variable Graph (PCA)**
+*The labeled variables are the ones best represented on the plot.*
+
+* * *
+
+The **dimension 1** opposes individuals characterized by a strongly positive coordinate on the axis (right side of the plot) to individuals characterized by a strongly negative coordinate on the axis (left side of the plot).
+
+Group 1 (characterized by a positive coordinate on the axis) shares:
+
+- High values for the variables *stress*, *mauvaise_concentration*, *etat_memoire*, *maux_de_tête* & *interdivert* (from most extreme to least extreme).
+- Low values for the variables *sports_collectifs*, *argentdiver* & *vie_associative* (from most extreme to least extreme).
+
+
+Group 2 (characterized by negative coordinates on the axis) shares:
+
+- Low values for the variables *formation*, *encadrement*, *mauvaise_concentration*, *stress*, *etat_memoire*, *maux_de_tête*, *interdivert* & *sports_collectifs* (from most extreme to least extreme).
+
+
+
+The **dimension 2** opposes individuals characterized by a strongly positive coordinate on the axis (top of the plot) to individuals characterized by a strongly negative coordinate on the axis (bottom of the plot).
+
+Group 1 (characterized by a positive coordinate on the axis) shares:
+
+- High values for the variables *formation*, *encadrement*, *sports_collectifs*, *argentdiver* & *vie_associative* (from most extreme to least extreme).
+
+- Low values for the variables *stress*, *maux_de_tête*, *etat_memoire* & *mauvaise_concentration* (from most extreme to least extreme).
+
+
+Group 2 (characterized by negative coordinates on the axis) shares:
+
+- High values for the variables *stress*, *mauvaise_concentration*, *etat_memoire*, *maux_de_tête* & *interdivert* (from most extreme to least extreme).
+
+- Low values for the variables *sports_collectifs*, *argentdiver* et *vie_associative* (from most extreme to least extreme).
+
+
+
+
+- - -
+
+
+```{r }
+drawn <-
+c("interdivert", "interetu", "argentdiver", "vie_associative", 
+"sports_collectifs")
+par(mar = c(4.1, 4.1, 1.1, 2.1))
+plot.PCA(res.pca, select = drawn, axes = 3:4, choix = 'var', title = '', cex = 0.7)
+
+```
+
+
+
+**Figure 4.2 - Graph of Variables (PCA)**
+*The labeled variables are those best represented on the plane.*
+
+* * *
+
+The **dimension 3** contrasts individuals characterized by a strongly positive coordinate on the axis (right side of the graph)
+with individuals characterized by a strongly negative coordinate on the axis (left side of the graph).
+
+Group 1 (characterized by a positive coordinate on the axis) shares:
+
+- High values for the variables *argentdiver*, *sports_collectifs*, *vie_associative*, *interdivert* & *interetu*  (from most extreme to least extreme).
+- Low values for the variables *formation* & *encadrement*  (from most extreme to least extreme).
+
+
+
+Group 2 (characterized by negative coordinates on the axis) shares:
+
+- High values for the variables *interetu*, *maux_de_tête* & *stress* (from most extreme to least extreme).
+- Low values for the variables *interdivert*, *argentdiver*, *mauvaise_concentration* & *sports_collectifs* (from most extreme to least extreme).
+
+
+* * *
+
+**Dimension 4** contrasts individuals characterized by a strongly positive coordinate on the axis (top of the graph)
+with individuals characterized by a strongly negative coordinate on the axis (bottom of the graph).
+
+Group 1 (characterized by a positive coordinate on the axis) shares:
+
+- High values for the variables *argentdiver*, *sports_collectifs*, *vie_associative*, *interdivert* et *interetu* (from most extreme to least extreme).
+- Low values for the variables *formation* & *encadrement* (from most extreme to least extreme).
+
+Group 2 (characterized by negative coordinates on the axis) shares:
+
+- High values for the variables *interdivert*, *mauvaise_concentration*, *formation* & *encadrement* (from most extreme to least extreme).
+- Low values for the variables *interetu*, *vie_associative*, *maux_de_tête*, *sports_collectifs*, *argentdiver* & *stress* (from most extreme to least extreme).
+
+
+- - -
+
+
+
+#  Individual Graph: 
+
+```{r}
+
+
+fviz_pca_ind(res.pca, col.ind = "cos2",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+            
+)
+
+fviz_pca_ind(res.pca,axes=c(4, 5),geom = "point",col.ind.sup = 'gray')
+```
+
+
+
+
+
+
+```{r}
+plot.PCA(res.pca, axes=c(4, 2), choix="ind", cex=0.7)
+```
+
+
+CLustering using HCPC 
+```{r}
+dd <- dist(scale(data1), method = "euclidean")
+hc <- hclust(dd, method = "ward.D2")
+plot(hc, hang = -1, cex = 0.6)
+library(FactoMineR)
+res.HCPC<-HCPC(res.pca,consol=TRUE,graph=FALSE)
+plot.HCPC(res.HCPC,choice='tree',title='Hierarchical tree')
+```
+
+
+- Hierarchical tree: The classification on individuals reveals 3 classes. They can be projected onto the dimension 1 and 2 map or visualize the Hierarchical tree on the 3D plane.
+```{r}
+plot.HCPC(res.HCPC,choice='map',draw.tree=FALSE,title='Factor map')
+plot.HCPC(res.HCPC,choice='3D.map',ind.names=FALSE,centers.plot=FALSE,angle=60,title='Hierarchical tree on the factor map') 
+```
+
+Class Descriptions:
+```{r}
+ 
+head(res.HCPC$data.clust) # cette commande nous  montre a quelle classe appartient chaque individu
+```
+
+**Note:** Describing classes by individuals in our case is not useful since visualizing the most characteristic individual in class; in other words, the furthest from other classes, doesn't provide much information, especially since individuals don't have names, they are labeled by numbers. 
+
+# Description of classes by variables / Factorial axes
+```{r}
+res.HCPC$desc.var  # Description des classe par les variables 
+#Eta decrit le rapport le correlation entre variable et les classes Globalement 
+#puis entrons dans les details on decrit chaque classe par les variables qui ont un V test significatif superieure à deux en valeur absolue
+#si c'est positive indique qu'elle est superieure a la moyenne sinon le contraire
+res.HCPC$desc.axes  # Description des classe par les axes factoriels 
+# on cherche si les indivudus de chaque ont des valeurs significativelment plus faibles ou plus fortes par rapport aux autres sur les axes factoriels
+```
+
+## In Conclusion 
+
+
+
+-Hierarchical Ascendant Classification of individuals shows that:
+- **Class 1** consists of individuals sharing:
+
+High values for the variables formation, encadrement, vie_associative, sports_collectifs, and argentdiver (from most extreme to least extreme).
+Low values for the variables stress, mauvaise_concentration, etat_memoire, maux_de_tête, and interetu (from most extreme to least extreme).
+- **Class 2** consists of individuals sharing:
+
+High values for the variable interetu.
+Low values for the variables formation, mauvaise_concentration, interdivert, encadrement, and argentdiver (from most extreme to least extreme).
+- **Class 3** consists of individuals sharing:
+
+High values for the variables mauvaise_concentration, stress, etat_memoire, maux_de_tête, and interdivert (from most extreme to least extreme).
+Low values for the variables vie_associative, sports_collectifs, and argentdiver (from most extreme to least extreme).
+
+
+#ACM
+The objective is to identify:
+A group of people with a similar profile in their responses to questions.
+```{r}
+
+data2=select(data,fumeur,Pratique_du_sport,pres_cours,med_antistress) 
+```
+
+## Calculate the cumulative inertia rate of the first 2 axes of this ACM:
+
+
+
+```{r}
+res.MCA<-MCA(data2,graph=FALSE)
+res.MCA$eig
+```
+##  Number of axes to retain based on 3 different criteria.
+Criterion: Plot the graph of eigenvalues and note that the elbow is at the level of the second axis.
+
+
+```{r}
+fviz_screeplot(res.MCA)
+```
+
+
+
+```{r}
+plot.MCA(res.MCA, choix='var',title="Graphe des variables")
+plot.MCA(res.MCA,title="Graphe de l'ACM",label =c('ind','var'))
+```
+It can be observed that:
+
+
+```{r}
+
+#Représentation de la première carte des modalités
+fviz_mca_var (res.MCA,
+              repel = TRUE, 
+              ggtheme = theme_minimal ())
+
+
+```
+
+
+
+```{r}
+
+# Sélectionner et visualiser les modalités avec cos2 >= 0.4
+fviz_mca_var(res.MCA, select.var = list(cos2 = 0.3))
+
+dimdesc(res.MCA, axes=1:2, proba=0.05)$`Dim 1`
+```
+
+
+It can be observed that for **Dimension 1**:
+The modality Pratique du sport_oui (with contrib=27%) (vtest=-15)
+opposes the modality med_antistress_oui (with contrib=28%) (v_test=15).
+Regarding **Dimension 2**:
+It does not provide a relevant result because the contributions on the negative axis of opposed modalities are very low.
+
